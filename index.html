@@ -1,0 +1,1020 @@
+<title>Courier Ops Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one live strip, then KPIs, then two-column chart rows, then exception tables. Cool slate neutrals, indigo accent. */
+:root {
+  --bg: #F1F3F6; --surface: #FFFFFF; --ink: #161B26; --muted: #5A6477; --line: #DCE1E9; --faint: #EEF1F5;
+  --accent: #3B4CCA; --accent-soft: #E6E9FA; --on-accent: #FFFFFF;
+  --ok: #1B7F4B; --ok-soft: #E1F2E8; --warn: #8F5B00; --warn-soft: #FBEFD5; --bad: #B3342A; --bad-soft: #FBE3E0;
+  --demand: #3B4CCA; --supply: #00899B; --ghost: #8791A6;
+  --st1: #B5452F; --st2: #00899B; --st3: #C98A00; --st4: #3B4CCA;
+  --font: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1219; --surface: #161B26; --ink: #E7EBF3; --muted: #9AA4B8; --line: #273044; --faint: #1C2230;
+    --accent: #8C9BFF; --accent-soft: #222A52; --on-accent: #0E1219;
+    --ok: #4CC38A; --ok-soft: #14301F; --warn: #E3B04B; --warn-soft: #3A2D10; --bad: #F2796D; --bad-soft: #40201D;
+    --demand: #6F80EE; --supply: #1FA3B3; --ghost: #7D879C;
+    --st1: #D8644C; --st2: #1FA3B3; --st3: #B8860B; --st4: #6F80EE;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1219; --surface: #161B26; --ink: #E7EBF3; --muted: #9AA4B8; --line: #273044; --faint: #1C2230;
+  --accent: #8C9BFF; --accent-soft: #222A52; --on-accent: #0E1219;
+  --ok: #4CC38A; --ok-soft: #14301F; --warn: #E3B04B; --warn-soft: #3A2D10; --bad: #F2796D; --bad-soft: #40201D;
+  --demand: #6F80EE; --supply: #1FA3B3; --ghost: #7D879C;
+  --st1: #D8644C; --st2: #1FA3B3; --st3: #B8860B; --st4: #6F80EE;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.45; padding-inline: 16px; }
+.wrap { max-width: 1320px; margin-inline: auto; padding-block: 20px 40px; display: flex; flex-direction: column; gap: 16px; }
+h1, h2, h3, p { margin: 0; }
+h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 15px; font-weight: 700; letter-spacing: -0.005em; }
+.mono { font-family: var(--mono); }
+.muted { color: var(--muted); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 14px 24px; }
+.title { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--muted); font-size: 12.5px; }
+.meta .mono { font-size: 12px; }
+.tag { border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; font-size: 11.5px; font-weight: 600; background: var(--surface); }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 2px; gap: 2px; }
+.seg button { font: inherit; font-weight: 600; font-size: 13px; border: 0; background: transparent; color: var(--muted); padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.seg button:not([aria-pressed="true"]):hover { color: var(--ink); background: var(--faint); }
+label.sel { display: flex; flex-direction: column; gap: 2px; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+select { font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 28px 6px 10px; min-width: 128px; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 16px; margin-bottom: 12px; }
+.panel-head .note { color: var(--muted); font-size: 12.5px; }
+.row2 { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 980px) { .row2 { grid-template-columns: minmax(0, 1fr); } }
+
+/* live strip */
+.live { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 0; overflow: hidden; }
+.live > div { padding: 14px 16px; border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.live > div:first-child { border-left: 0; }
+.live .lbl { font-size: 11.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.live .val { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.live .sub { font-size: 12.5px; color: var(--muted); }
+.live .val.warn { color: var(--warn); } .live .val.bad { color: var(--bad); }
+@media (max-width: 820px) {
+  .live { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .live > div { border-left: 0; border-top: 1px solid var(--line); }
+  .live > div:nth-child(-n+2) { border-top: 0; }
+  .live > div:nth-child(even) { border-left: 1px solid var(--line); }
+}
+
+/* KPI tiles */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.kpi .lbl { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.kpi .val { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.kpi .val small { font-size: 14px; font-weight: 600; color: var(--muted); margin-left: 3px; letter-spacing: 0; }
+.kpi .dl { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); min-height: 22px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 1px 8px; font-weight: 700; font-size: 12px; font-variant-numeric: tabular-nums; background: var(--faint); color: var(--muted); }
+.chip.good { background: var(--ok-soft); color: var(--ok); } .chip.bad { background: var(--bad-soft); color: var(--bad); }
+.spark { height: 30px; margin-top: 2px; }
+
+/* charts */
+.chart { width: 100%; }
+.chart svg { display: block; max-width: 100%; overflow: visible; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.legend i.ln { height: 0; width: 16px; border-top: 2px solid; border-radius: 0; }
+.legend i.dash { border-top-style: dashed; }
+.legend i.dot { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--ghost); background: var(--surface); }
+.ax { fill: var(--muted); font: 500 11px var(--font); font-variant-numeric: tabular-nums; }
+.cap { fill: var(--ink); font: 700 11.5px var(--font); }
+.gl { stroke: var(--line); stroke-width: 1; }
+.hit { fill: transparent; }
+.hit:hover { fill: var(--accent); fill-opacity: 0.07; }
+.stage-row.dim { opacity: 0.35; }
+.tip { position: fixed; top: 0; left: 0; z-index: 20; pointer-events: none; background: var(--ink); color: var(--bg); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; display: flex; flex-direction: column; gap: 1px; max-width: 260px; box-shadow: 0 6px 20px rgba(0,0,0,0.22); font-variant-numeric: tabular-nums; }
+.tip b { font-weight: 700; margin-bottom: 2px; }
+details.data { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+details.data summary { cursor: pointer; font-weight: 600; width: max-content; }
+
+/* tables */
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; font-variant-numeric: tabular-nums; }
+tbody tr:last-child td { border-bottom: 0; }
+th.r, td.r { text-align: right; }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: var(--faint); }
+tr.sel td { background: var(--accent-soft); }
+td .mono { font-size: 12px; color: var(--muted); }
+.pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px 2px 8px; font-size: 12px; font-weight: 700; }
+.pill::before { content: ""; width: 8px; height: 8px; background: currentColor; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); } .pill.ok::before { border-radius: 50%; }
+.pill.short { background: var(--bad-soft); color: var(--bad); } .pill.short::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.pill.surplus { background: var(--accent-soft); color: var(--accent); } .pill.surplus::before { border-radius: 2px; }
+.pill.warn { background: var(--warn-soft); color: var(--warn); } .pill.warn::before { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); margin: 0 0 8px; }
+.tabs button { font: inherit; font-weight: 600; font-size: 13px; color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; margin-bottom: -1px; cursor: pointer; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabs .n { font-variant-numeric: tabular-nums; background: var(--faint); border-radius: 999px; padding: 0 7px; margin-left: 6px; font-size: 12px; }
+.empty { padding: 18px 4px; color: var(--muted); }
+.more { padding: 8px 10px 0; color: var(--muted); font-size: 12.5px; }
+
+.insights { display: flex; flex-direction: column; gap: 10px; padding: 0; margin: 0; list-style: none; max-width: 78ch; }
+.insights li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 6px; }
+.insights li b { font-weight: 700; }
+.insights .k { color: var(--accent); font-weight: 800; }
+dl.defs { display: grid; grid-template-columns: minmax(130px, 200px) minmax(0, 1fr); gap: 8px 18px; margin: 12px 0 0; font-size: 13px; }
+dl.defs dt { font-weight: 700; } dl.defs dd { margin: 0; color: var(--muted); }
+@media (max-width: 560px) { dl.defs { grid-template-columns: minmax(0, 1fr); gap: 2px; } dl.defs dd { margin-bottom: 8px; } }
+details.defsbox summary { cursor: pointer; font-weight: 700; font-size: 15px; }
+/* load panel */
+.btn { font: inherit; font-weight: 700; font-size: 13px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+.btn:hover { background: var(--faint); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: 0.55; cursor: default; }
+#loader { display: flex; flex-direction: column; gap: 14px; }
+#loader[hidden] { display: none; }
+#loader .panel-head { margin-bottom: 0; }
+.load-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.drop { border: 1px dashed var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; align-items: flex-start; }
+.drop .req { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.drop code { font-family: var(--mono); font-size: 11.5px; background: var(--faint); border-radius: 6px; padding: 6px 8px; display: block; overflow-wrap: anywhere; color: var(--ink); align-self: stretch; }
+.drop input[type=file] { font: inherit; font-size: 12.5px; max-width: 100%; color: var(--ink); }
+.small { font-size: 12.5px; }
+.load-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.msg { font-size: 13px; padding: 9px 12px; border-radius: 8px; max-width: 100%; }
+.msg.err { background: var(--bad-soft); color: var(--bad); }
+.msg.ok { background: var(--ok-soft); color: var(--ok); }
+.msg.info { background: var(--accent-soft); color: var(--ink); }
+.tag.mine { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+footer { color: var(--muted); font-size: 12.5px; max-width: 90ch; }
+@media (prefers-reduced-motion: no-preference) { .seg button, tr.click td { transition: background-color 0.12s; } }
+</style>
+
+<div class="wrap" id="app">
+  <header>
+    <div class="title">
+      <h1>Courier Ops Board</h1>
+      <div class="meta" id="metaLine"></div>
+    </div>
+    <div class="controls">
+      <button type="button" class="btn" id="loadBtn" aria-expanded="false" aria-controls="loader">Load your data</button>
+      <div class="seg" id="rangeSeg" role="group" aria-label="Date range">
+        <button type="button" data-v="today" aria-pressed="true">Today</button>
+        <button type="button" data-v="7d" aria-pressed="false">Last 7 days</button>
+        <button type="button" data-v="14d" aria-pressed="false">Last 14 days</button>
+      </div>
+      <label class="sel" for="zoneSel">Zone<select id="zoneSel"></select></label>
+      <label class="sel" for="vehSel">Vehicle<select id="vehSel"><option value="all">All vehicles</option><option value="motorbike">Motorbike</option><option value="bike">Bicycle</option></select></label>
+    </div>
+  </header>
+
+  <div class="msg info" id="dataNote" role="status" hidden></div>
+
+  <section class="panel" id="loader" aria-label="Load your data" hidden>
+    <div class="panel-head"><h2>Load your data</h2><span class="note">Files are read in this browser. Nothing is uploaded.</span></div>
+    <div class="load-grid">
+      <div class="drop">
+        <span class="req">Required</span>
+        <label for="fOrders"><b>Orders</b>, one row per order</label>
+        <input id="fOrders" type="file" accept=".csv,.tsv,.txt,text/csv">
+        <code id="gOrders">order_id, zone, courier_id, created_at, accepted_at, arrived_pickup_at, picked_up_at, delivered_at, status, promised_minutes</code>
+        <span class="muted small">Optional: rejections, rejected_by, cancelled_by, cancelled_at</span>
+        <button type="button" class="btn" data-copy="gOrders">Copy header row</button>
+      </div>
+      <div class="drop">
+        <span class="req">Optional</span>
+        <label for="fCouriers"><b>Couriers</b></label>
+        <input id="fCouriers" type="file" accept=".csv,.tsv,.txt,text/csv">
+        <code id="gCouriers">courier_id, name, home_zone, vehicle, tenure_weeks</code>
+        <span class="muted small">Without it, everyone is a motorbike courier working in the zone they serve most.</span>
+        <button type="button" class="btn" data-copy="gCouriers">Copy header row</button>
+      </div>
+      <div class="drop">
+        <span class="req">Optional</span>
+        <label for="fShifts"><b>Shifts</b></label>
+        <input id="fShifts" type="file" accept=".csv,.tsv,.txt,text/csv">
+        <code id="gShifts">courier_id, shift_start, shift_end</code>
+        <span class="muted small">Without it, online time is estimated from each courier's first and last order of the day.</span>
+        <button type="button" class="btn" data-copy="gShifts">Copy header row</button>
+      </div>
+    </div>
+    <p class="muted small">Write times as YYYY-MM-DD HH:MM in 24-hour local time. Status is delivered or cancelled; an order with no delivery time and no cancellation counts as in progress. The latest timestamp in the file is treated as "now".</p>
+    <div class="load-actions">
+      <button type="button" class="btn primary" id="buildBtn">Build dashboard</button>
+      <button type="button" class="btn" id="sampleBtn">Use sample data</button>
+      <button type="button" class="btn" id="closeLoad">Close</button>
+    </div>
+    <div id="loadMsg" role="status" aria-live="polite"></div>
+  </section>
+
+  <section class="panel live" id="live" aria-label="Right now"></section>
+  <section class="kpis" id="kpis" aria-label="Key metrics"></section>
+
+  <div class="row2">
+    <section class="panel">
+      <div class="panel-head"><h2 id="hourTitle">Supply and demand today</h2><span class="note" id="hourNote"></span></div>
+      <div class="legend">
+        <span><i style="background:var(--demand)"></i>Orders today</span>
+        <span><i class="dot"></i><span id="lgLast">Orders last Tuesday</span></span>
+        <span><i class="ln" style="border-color:var(--supply)"></i>Couriers online (dashed = still rostered)</span>
+      </div>
+      <div class="chart" id="chHour"></div>
+      <details class="data"><summary>View as table</summary><div class="tbl" id="tblHour"></div></details>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>Zones right now</h2><span class="note">Select a row to filter the board</span></div>
+      <div class="tbl" id="zones"></div>
+    </section>
+  </div>
+
+  <div class="row2">
+    <section class="panel">
+      <div class="panel-head"><h2>Daily trend</h2><span class="note">Last 14 days and today so far</span></div>
+      <div class="chart" id="chTrend"></div>
+      <details class="data"><summary>View as table</summary><div class="tbl" id="tblTrend"></div></details>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>Where the time goes</h2><span class="note" id="stageNote"></span></div>
+      <div class="legend" id="stageLegend"></div>
+      <div class="chart" id="chStage"></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Needs attention</h2><span class="note" id="excNote">Live as of 12:20</span></div>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <div class="tbl" id="exc"></div>
+  </section>
+
+  <div class="row2">
+    <section class="panel">
+      <div class="panel-head"><h2>What this suggests</h2><span class="note">Written from the numbers above</span></div>
+      <ul class="insights" id="insights"></ul>
+    </section>
+    <section class="panel">
+      <details class="defsbox" open>
+        <summary>How each metric is defined</summary>
+        <dl class="defs">
+          <dt>Delivery time</dt><dd>Minutes from order created to handed to the customer. Cancelled and in-progress orders are left out.</dd>
+          <dt>On-time rate</dt><dd>Delivered orders whose delivery time is within the promised minutes recorded on the order.</dd>
+          <dt>Courier utilization</dt><dd>Minutes a courier holds an accepted order divided by minutes they are online.</dd>
+          <dt>Wait at restaurant</dt><dd>Minutes between the courier arriving at the pickup point and leaving with the food.</dd>
+          <dt>Waiting for courier</dt><dd>Orders placed but not yet accepted by a courier.</dd>
+          <dt>Orders per courier</dt><dd>Orders created in the last 60 minutes divided by couriers online now in that zone.</dd>
+          <dt>Zone status</dt><dd>Short: 3 or more orders waiting, or 2.6 or more orders per courier. Surplus: under 45% of online couriers busy.</dd>
+          <dt>Idle courier</dt><dd>Online, no order for 12 minutes or more.</dd>
+          <dt>Reliability flag</dt><dd>Last 7 days: rejects 30% or more of offers (25+ offers), or cancels 6% or more of orders (15+ orders).</dd>
+        </dl>
+      </details>
+    </section>
+  </div>
+
+  <footer id="foot"></footer>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+/* ===== Sample data model: couriers, shifts and orders (seeded, so it is repeatable) ===== */
+let NOW = 12 * 60 + 20;            // data as of 12:20 today, minutes after midnight
+const DAYS = 15;                     // day 0 = today (Tue 13 Oct 2026), days 1..14 = earlier days
+let TODAY_MS = Date.UTC(2026, 9, 13);
+const SAMPLE_ZONES = [
+  { id: 'Westlands',  w: 1.6, dist: 1.0, sup: 0.6, near: ['Parklands', 'Kileleshwa', 'Lavington'] },
+  { id: 'CBD',        w: 1.3, dist: 0.9, sup: 1.0, near: ['Parklands', 'South B', 'Kilimani'] },
+  { id: 'Kilimani',   w: 1.3, dist: 1.0, sup: 1.0, near: ['Kileleshwa', 'Lavington', 'CBD'] },
+  { id: 'Parklands',  w: 0.8, dist: 0.9, sup: 0.9, near: ['Westlands', 'CBD'] },
+  { id: 'Lavington',  w: 0.7, dist: 1.1, sup: 0.9, near: ['Kilimani', 'Kileleshwa', 'Westlands', 'Karen'] },
+  { id: 'Kileleshwa', w: 0.7, dist: 1.0, sup: 1.0, near: ['Kilimani', 'Westlands', 'Lavington'] },
+  { id: 'South B',    w: 0.6, dist: 1.0, sup: 1.5, near: ['CBD'] },
+  { id: 'Karen',      w: 0.4, dist: 1.5, sup: 0.8, near: ['Lavington'] },
+];
+let ZONES = SAMPLE_ZONES;
+let ZMAP = Object.fromEntries(ZONES.map(z => [z.id, z]));
+const HOUR_W = [0,0,0,0,0,0,0,0.25,0.45,0.55,0.65,1.0,1.7,2.0,1.3,0.75,0.7,0.95,1.5,2.0,1.75,1.15,0.6,0.3];
+const DOW_MULT = [1.05, 0.9, 0.92, 0.95, 1.0, 1.25, 1.2];   // Sun..Sat
+const SHIFT_TYPES = [
+  { s: 7 * 60,  e: 14 * 60,      p: 0.20 },
+  { s: 11 * 60, e: 15 * 60 + 30, p: 0.22 },
+  { s: 17 * 60, e: 22 * 60 + 30, p: 0.28 },
+  { s: 10 * 60, e: 21 * 60 + 30, p: 0.18 },
+  { s: 15 * 60, e: 23 * 60,      p: 0.12 },
+];
+const FIRST = ['Brian','Kevin','Dennis','Peter','James','John','Samuel','Joseph','Collins','Victor','Ian','Felix','Allan','Eric','Moses','Martin','David','Isaac','Hassan','Ali','Mary','Faith','Grace','Mercy'];
+const LAST = 'OKMNWAJBCDEFGHILPRST';
+
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const weekdayOf = day => (((2 - day) % 7) + 7) % 7;           // 13 Oct 2026 is a Tuesday (2)
+const dateOf = day => new Date(TODAY_MS - day * 864e5);
+const gauss = (h, m, s) => Math.exp(-Math.pow((h - m) / s, 2) / 2);
+const traffic = t => { const h = t / 60; return 1 + 0.45 * gauss(h, 8.5, 1) + 0.55 * gauss(h, 13, 1.2) + 0.9 * gauss(h, 18.5, 1.4); };
+const foodPeak = t => { const h = t / 60; return gauss(h, 13.2, 1) + gauss(h, 19.5, 1.3); };
+
+function build() {
+  const rng = mulberry32(20261013), R = () => rng();
+  const N = (m, s) => m + s * Math.sqrt(-2 * Math.log(1 - R())) * Math.cos(6.283185307 * R());
+  const wpick = (arr, fn) => { let tot = 0; for (const x of arr) tot += fn(x); let r = R() * tot; for (const x of arr) { r -= fn(x); if (r <= 0) return x; } return arr[arr.length - 1]; };
+  const couriers = [];
+  for (let i = 0; i < 150; i++) {
+    const flagR = R() < 0.08, flagC = R() < 0.05;
+    const type = wpick(SHIFT_TYPES, s => s.p);
+    const c = {
+      i, id: 'C-' + (1001 + i),
+      name: FIRST[Math.floor(R() * FIRST.length)] + ' ' + LAST[Math.floor(R() * LAST.length)] + '.',
+      veh: R() < 0.72 ? 'motorbike' : 'bike',
+      zone: wpick(ZONES, z => z.w * z.sup).id,
+      tenure: 1 + Math.floor(R() * 80),
+      rp: flagR ? 0.35 + R() * 0.25 : 0.05 + R() * 0.14,
+      cp: flagC ? 0.07 + R() * 0.05 : 0.004 + R() * 0.014,
+      sh: [], st: [], freeAt: 0,
+    };
+    for (let d = 0; d < DAYS; d++) {
+      const wd = weekdayOf(d), works = R() < (wd === 0 || wd === 5 || wd === 6 ? 0.8 : 0.7);
+      c.sh[d] = works ? [type.s + Math.round(N(0, 15)), type.e + Math.round(N(0, 15))] : null;
+      c.st[d] = { n: 0, rej: 0, can: 0 };
+    }
+    couriers.push(c);
+  }
+  const TW = [6, 1.5, 0.15], PEN = [0, 4, 12], CROSS = [0, 3, 7];
+  const tier = (c, z) => c.zone === z.id ? 0 : z.near.includes(c.zone) ? 1 : 2;
+  const orders = [], byDay = [];
+  let oid = 40000;
+  for (let day = DAYS - 1; day >= 0; day--) {
+    couriers.forEach(c => c.freeAt = 0);
+    const total = Math.round(930 * DOW_MULT[weekdayOf(day)] * (0.95 + R() * 0.1) * (1 + (DAYS - 1 - day) * -0.004 + 0.05));
+    const times = [];
+    for (let k = 0; k < total; k++) { const h = wpick([...Array(24).keys()], x => HOUR_W[x]); times.push(h * 60 + R() * 60); }
+    times.sort((a, b) => a - b);
+    const list = [];
+    for (const t of times) {
+      if (day === 0 && t > NOW) break;
+      const z = wpick(ZONES, x => x.w);
+      const cands = couriers.filter(c => c.sh[day] && c.sh[day][0] <= t && c.sh[day][1] > t + 15);
+      const rejected = new Set(); let rej = 0, delay = 0, chosen = null;
+      for (let k = 0; k < 4; k++) {
+        const pool = cands.filter(c => !rejected.has(c.i));
+        if (!pool.length) break;
+        const free = pool.filter(c => c.freeAt <= t);
+        const c = free.length ? wpick(free, x => TW[tier(x, z)]) : pool.reduce((a, b) => (b.freeAt + PEN[tier(b, z)] < a.freeAt + PEN[tier(a, z)] ? b : a));
+        if (k < 3 && R() < c.rp) { rejected.add(c.i); c.st[day].rej++; rej++; delay += 1.2 + R() * 2; continue; }
+        chosen = c; break;
+      }
+      if (!chosen) { chosen = couriers[Math.floor(R() * couriers.length)]; delay += 12 + R() * 6; chosen.freeAt = Math.min(chosen.freeAt, t); }
+      const c = chosen, tr = tier(c, z), tf = traffic(t) * (day === 0 && t >= 660 ? 1.45 : 1), vf = c.veh === 'bike' ? 1.35 : 1;
+      const queue = Math.max(0, c.freeAt - t);
+      const as = 0.8 + R() * 1.5 + delay + queue;
+      const tp = Math.max(2, (2 + 3.2 * z.dist * tf + CROSS[tr] + N(0, 1.1)) * vf);
+      const prep = Math.max(4, N(13 + 5 * foodPeak(t), 4));
+      const pw = Math.max(0.5, 1 + prep - as - tp);
+      const dr = Math.max(4, (3.5 + 5.0 * z.dist * tf + N(0, 1.8)) * vf) + 1.5;
+      const tot = as + tp + pw + dr, prom = Math.round(28 + 7 * z.dist);
+      let st = 'delivered', by = '';
+      if (R() < c.cp) { st = 'cancelled'; by = 'courier'; }
+      else if (R() < 0.018 + (as > 12 ? 0.1 : 0)) { st = 'cancelled'; by = 'customer'; }
+      const end = st === 'delivered' ? t + tot : t + as + tp * 0.5;
+      c.freeAt = end; c.st[day].n++; if (by === 'courier') c.st[day].can++;
+      list.push({ id: 'G-' + (oid++), day, zone: z.id, veh: c.veh, cz: c.zone, ci: c.i, t, as, tp, pw, dr, tot, prom, st, by, rej, end });
+    }
+    byDay[day] = list; orders.push(...list);
+  }
+  couriers.forEach(c => c.free0 = c.freeAt);
+  return { couriers, orders, byDay };
+}
+let D = build();
+const SAMPLE = { D, NOW, TODAY_MS, ZONES: SAMPLE_ZONES };
+/* free0 is the state after the last day built (today), which is what idle detection needs */
+
+/* ===== Metrics ===== */
+const passO = (o, f) => (f.zone === 'all' || o.zone === f.zone) && (f.veh === 'all' || o.veh === f.veh);
+const passC = (c, f) => (f.zone === 'all' || c.zone === f.zone) && (f.veh === 'all' || c.veh === f.veh);
+const overlap = (a, b, lo, hi) => Math.max(0, Math.min(b, hi) - Math.max(a, lo));
+const FULL = 1e9;
+
+function kpisFor(days, cut, f) {
+  let n = 0, done = 0, del = 0, ontime = 0, sumTot = 0, sumPw = 0, sumAs = 0, canc = 0, busy = 0, online = 0;
+  for (const d of days) {
+    for (const o of D.byDay[d]) {
+      if (o.t > cut) continue;
+      if (passC({ zone: o.cz, veh: o.veh }, f)) busy += overlap(o.t + o.as, o.end, 0, cut);
+      if (!passO(o, f)) continue;
+      n++;
+      if (o.end > cut) continue;
+      done++;
+      if (o.st === 'cancelled') canc++;
+      else { del++; sumTot += o.tot; sumPw += o.pw; sumAs += o.as; if (o.tot <= o.prom) ontime++; }
+    }
+    for (const c of D.couriers) if (c.sh[d] && passC(c, f)) online += overlap(c.sh[d][0], c.sh[d][1], 0, cut);
+  }
+  return { orders: n, delivered: del, avgTot: del ? sumTot / del : null, onTime: del ? ontime / del : null,
+    pickupWait: del ? sumPw / del : null, assignWait: del ? sumAs / del : null, cancel: done ? canc / done : null,
+    util: online ? Math.min(1, busy / online) : null, onlineMin: online };
+}
+function windowsFor(range) {
+  const seq = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+  if (range === 'today') return { cur: { days: [0], cut: NOW }, prev: { days: [7], cut: NOW }, label: 'last ' + weekdayName(7) + ', same time' };
+  if (range === '7d') return { cur: { days: seq(1, 7), cut: FULL }, prev: { days: seq(8, 14), cut: FULL }, label: 'the 7 days before' };
+  return { cur: { days: seq(1, 14), cut: FULL }, prev: null, label: '' };
+}
+function daily(f) { return Array.from({ length: DAYS }, (_, d) => kpisFor([d], d === 0 ? NOW : FULL, f)); }
+function hourly(day, f, cut) {
+  const orders = Array(24).fill(0), couriers = Array(24).fill(0);
+  for (const o of D.byDay[day]) if (o.t <= cut && passO(o, f)) orders[Math.floor(o.t / 60)]++;
+  for (const c of D.couriers) if (c.sh[day] && passC(c, f)) for (let h = 0; h < 24; h++) couriers[h] += overlap(c.sh[day][0], c.sh[day][1], h * 60, h * 60 + 60) / 60;
+  return { orders, couriers };
+}
+function stageByZone(days, cut, veh) {
+  return ZONES.map(z => {
+    let n = 0, as = 0, tp = 0, pw = 0, dr = 0, pr = 0;
+    for (const d of days) for (const o of D.byDay[d]) if (o.zone === z.id && (veh === 'all' || o.veh === veh) && o.t <= cut && o.end <= cut && o.st === 'delivered') { n++; as += o.as; tp += o.tp; pw += o.pw; dr += o.dr; pr += o.prom; }
+    return n ? { zone: z.id, n, as: as / n, tp: tp / n, pw: pw / n, dr: dr / n, prom: pr / n } : { zone: z.id, n: 0, as: 0, tp: 0, pw: 0, dr: 0, prom: 0 };
+  }).sort((a, b) => (b.as + b.tp + b.pw + b.dr) - (a.as + a.tp + a.pw + a.dr));
+}
+
+/* ===== Live view (always "now") ===== */
+const onlineNow = c => c.sh[0] && c.sh[0][0] <= NOW && NOW < c.sh[0][1];
+function liveState(f) {
+  const act = D.byDay[0].filter(o => o.end > NOW && passO(o, f));
+  const busySet = new Set(D.byDay[0].filter(o => o.end > NOW && o.t + o.as <= NOW).map(o => o.ci));
+  const on = D.couriers.filter(c => onlineNow(c) && passC(c, f));
+  const busy = on.filter(c => busySet.has(c.i)).length;
+  const pending = act.filter(o => NOW < o.t + o.as);
+  return { online: on.length, busy, idle: on.length - busy, pending: pending.length, active: act.length,
+    oldestWait: pending.length ? Math.max(...pending.map(o => NOW - o.t)) : 0 };
+}
+function zoneLive(veh) {
+  const f = { zone: 'all', veh };
+  const act = D.byDay[0].filter(o => o.end > NOW);
+  const busySet = new Set(act.filter(o => o.t + o.as <= NOW).map(o => o.ci));
+  return ZONES.map(z => {
+    const on = D.couriers.filter(c => c.zone === z.id && onlineNow(c) && (veh === 'all' || c.veh === veh));
+    const busy = on.filter(c => busySet.has(c.i)).length;
+    const mine = D.byDay[0].filter(o => o.zone === z.id && passO(o, f));
+    const rec = mine.filter(o => o.t > NOW - 60).length;
+    const pending = mine.filter(o => o.end > NOW && NOW < o.t + o.as).length;
+    const dn = mine.filter(o => o.end <= NOW && o.st === 'delivered');
+    const avgTot = dn.length ? dn.reduce((s, o) => s + o.tot, 0) / dn.length : null;
+    const onTime = dn.length ? dn.filter(o => o.tot <= o.prom).length / dn.length : null;
+    const perCourier = on.length ? rec / on.length : null;
+    const util = on.length ? busy / on.length : null;
+    let status = 'ok';
+    if (pending >= 3 || (perCourier !== null && perCourier >= 2.6) || (on.length === 0 && rec > 0)) status = 'short';
+    else if (on.length >= 4 && util !== null && util < 0.45) status = 'surplus';
+    return { zone: z.id, rec, online: on.length, busy, idle: on.length - busy, pending, perCourier, util, avgTot, onTime, status };
+  });
+}
+
+/* ===== Exceptions ===== */
+function lateOrders(f) {
+  return D.byDay[0].filter(o => o.end > NOW && passO(o, f)).map(o => {
+    const el = NOW - o.t, a = o.t + o.as, b = a + o.tp, c = b + o.pw;
+    const phase = NOW < a ? 'Waiting for courier' : NOW < b ? 'Courier heading to pickup' : NOW < c ? 'Waiting at restaurant' : 'On the way to customer';
+    return { id: o.id, zone: o.zone, courier: o.ci >= 0 ? D.couriers[o.ci].id : '–', veh: o.veh, elapsed: el, prom: o.prom, over: el - o.prom, phase, rej: o.rej };
+  }).filter(r => r.over >= -6 || (r.phase === 'Waiting for courier' && r.elapsed >= 5)).sort((a, b) => b.over - a.over);
+}
+function idleCouriers(f) {
+  return D.couriers.filter(c => onlineNow(c) && passC(c, f) && c.free0 <= NOW).map(c => {
+    const since = Math.max(c.free0, c.sh[0][0]);
+    return { id: c.id, name: c.name, zone: c.zone, veh: c.veh, idle: NOW - since, ends: c.sh[0][1] };
+  }).filter(r => r.idle >= 12).sort((a, b) => b.idle - a.idle);
+}
+function flaggedCouriers(f) {
+  return D.couriers.filter(c => passC(c, f)).map(c => {
+    let n = 0, rej = 0, can = 0;
+    for (let d = 0; d < 7; d++) { n += c.st[d].n; rej += c.st[d].rej; can += c.st[d].can; }
+    const offers = n + rej;
+    return { id: c.id, name: c.name, zone: c.zone, veh: c.veh, tenure: c.tenure, orders: n, rejRate: offers ? rej / offers : 0, canRate: n ? can / n : 0, offers, rej, can };
+  }).filter(r => (r.offers >= 25 && r.rejRate >= 0.3) || (r.orders >= 15 && r.canRate >= 0.06)).sort((a, b) => b.rejRate - a.rejRate);
+}
+
+/* ===== Loading real data from CSV ===== */
+const BIGV = 1e6, BIGE = 1e7;      // "not happened yet" markers for orders still in progress
+const weekdayName = d => dateOf(d).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
+const clean = s => String(s == null ? '' : s).replace(/[<>&"|]/g, '').trim();
+const A = {
+  id: ['order_id', 'id', 'order'], zone: ['zone', 'zone_name', 'delivery_zone', 'area'],
+  courier: ['courier_id', 'courier', 'rider_id', 'rider', 'driver_id'],
+  created: ['created_at', 'order_created_at', 'created', 'placed_at', 'order_time'],
+  accepted: ['accepted_at', 'courier_accepted_at', 'assigned_at', 'accepted'],
+  arrived: ['arrived_pickup_at', 'arrived_at_pickup', 'arrived_at_pickup_at', 'arrived_at_restaurant_at', 'pickup_arrival_at'],
+  picked: ['picked_up_at', 'pickup_at', 'collected_at', 'picked_up'],
+  delivered: ['delivered_at', 'completed_at', 'dropoff_at', 'delivered'],
+  cancelledAt: ['cancelled_at', 'canceled_at'], status: ['status', 'order_status', 'state'],
+  prom: ['promised_minutes', 'promised_min', 'sla_minutes', 'eta_minutes'],
+  rej: ['rejections', 'rejected_offers', 'reject_count'], rejBy: ['rejected_by', 'rejected_courier_ids'],
+  canBy: ['cancelled_by', 'canceled_by'],
+};
+const AC = { id: ['courier_id', 'id', 'courier', 'rider_id'], name: ['name', 'courier_name'], zone: ['home_zone', 'zone', 'base_zone'], veh: ['vehicle', 'vehicle_type'], tenure: ['tenure_weeks', 'tenure'] };
+const AS = { id: ['courier_id', 'courier', 'rider_id'], s: ['shift_start', 'start', 'started_at', 'online_from', 'login_at'], e: ['shift_end', 'end', 'ended_at', 'online_to', 'logout_at'] };
+
+function parseCSV(text) {
+  text = String(text).replace(/^﻿/, '');
+  const first = text.split(/\r?\n/, 1)[0];
+  const cnt = ch => first.split(ch).length;
+  const delim = cnt(';') > cnt(',') ? ';' : cnt('\t') > cnt(',') ? '\t' : ',';
+  const rows = []; let row = [], cur = '', q = false;
+  const flush = () => { row.push(cur); cur = ''; if (row.some(x => x !== '')) rows.push(row); row = []; };
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === delim) { row.push(cur); cur = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; flush(); }
+    else cur += ch;
+  }
+  if (cur !== '' || row.length) flush();
+  if (!rows.length) return [];
+  const head = rows[0].map(h => h.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''));
+  return rows.slice(1).map(r => { const o = {}; head.forEach((h, i) => { o[h] = (r[i] || '').trim(); }); return o; });
+}
+const g = (r, keys) => { for (const k of keys) if (r[k] !== undefined && r[k] !== '') return r[k]; return ''; };
+const has = (rows, keys) => rows.length > 0 && keys.some(k => k in rows[0]);
+function parseTs(s) {            // wall-clock time as written, returned as minutes since 1970 (no time zone conversion)
+  if (!s) return null;
+  let m = /(\d{4})-(\d{1,2})-(\d{1,2})[T ](\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(s);
+  if (m) return Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)) / 60000;
+  m = /(\d{1,2})\/(\d{1,2})\/(\d{4})[T ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(s);
+  if (m) return Date.UTC(+m[3], m[2] - 1, +m[1], +m[4], +m[5], +(m[6] || 0)) / 60000;
+  return null;
+}
+const normVeh = v => { v = (v || '').toLowerCase().trim(); if (!v) return 'motorbike'; if (/moto|scooter/.test(v)) return 'motorbike'; if (/cycl|bicycle|^bike$/.test(v)) return 'bike'; return clean(v); };
+
+function importData(oText, cText, sText) {
+  const oRows = parseCSV(oText), cRows = cText ? parseCSV(cText) : [], sRows = sText ? parseCSV(sText) : [];
+  if (!oRows.length) throw new Error('The orders file has no rows.');
+  const miss = [];
+  if (!has(oRows, A.zone)) miss.push('zone');
+  if (!has(oRows, A.created)) miss.push('created_at');
+  if (!has(oRows, A.delivered) && !has(oRows, A.status)) miss.push('delivered_at (or status)');
+  if (miss.length) throw new Error('The orders file is missing: ' + miss.join(', ') + '. Columns found: ' + Object.keys(oRows[0]).join(', ') + '.');
+  const meta = { bad: 0, old: 0, stale: 0, noProm: 0, noStages: 0, inferred: false, noCouriersFile: !cRows.length, noRejBy: !has(oRows, A.rejBy) };
+
+  const recs = []; let maxAbs = -Infinity;
+  oRows.forEach((r, ix) => {
+    const ev = [A.created, A.accepted, A.arrived, A.picked, A.delivered, A.cancelledAt].map(k => parseTs(g(r, k)));
+    if (ev[0] == null) { meta.bad++; return; }
+    for (const v of ev) if (v != null && v > maxAbs) maxAbs = v;
+    recs.push({ r, ev, ix });
+  });
+  if (!recs.length) throw new Error('No order has a readable created_at. Use the format YYYY-MM-DD HH:MM.');
+  const day0 = Math.floor(maxAbs / 1440) * 1440;
+
+  const raw = [];
+  for (const { r, ev, ix } of recs) {
+    const [cr, ac, ar, pu, de, ca] = ev, cd = Math.floor(cr / 1440) * 1440, day = Math.round((day0 - cd) / 1440);
+    if (day < 0 || day >= DAYS) { meta.old++; continue; }
+    const t = cr - cd, sr = g(r, A.status).toLowerCase();
+    let st = /cancel/.test(sr) ? 'cancelled' : de != null ? 'delivered' : 'active';
+    if (st === 'active' && day > 0) { st = 'cancelled'; meta.stale++; }
+    const d = (a, b) => a != null && b != null ? Math.max(0, b - a) : null;
+    const p0 = parseFloat(g(r, A.prom)); if (!(p0 > 0)) meta.noProm++;
+    let as, tp, pw, dr, tot, end;
+    if (st === 'delivered') {
+      tot = Math.max(0, de - cr);
+      if (ac == null && ar == null && pu == null) { meta.noStages++; as = 0; tp = 0; pw = 0; dr = tot; }
+      else { as = d(cr, ac) ?? 0; tp = d(ac, ar) ?? 0; pw = d(ar, pu) ?? 0; dr = d(pu, de) ?? 0; }
+      end = t + tot;
+    } else if (st === 'cancelled') {
+      as = (ac != null ? d(cr, ac) : ca != null ? d(cr, ca) : 0) ?? 0; tp = d(ac, ar) ?? 0; pw = 0; dr = 0; tot = 0;
+      end = ca != null ? t + d(cr, ca) : t + as + tp * 0.5;
+    } else {
+      as = ac != null ? d(cr, ac) : BIGV; tp = ac != null && ar != null ? d(ac, ar) : BIGV;
+      pw = ar != null && pu != null ? d(ar, pu) : BIGV; dr = BIGV; tot = 0; end = BIGE;
+    }
+    const cb = g(r, A.canBy).toLowerCase();
+    const rejBy = g(r, A.rejBy).split(/[;| ]+/).map(clean).filter(Boolean);
+    raw.push({ id: clean(g(r, A.id)) || 'O-' + (ix + 1), day, t, zone: clean(g(r, A.zone)) || 'Unknown', cid: clean(g(r, A.courier)),
+      as, tp, pw, dr, tot, prom: p0 > 0 ? p0 : 35, st, by: st !== 'cancelled' ? '' : /courier|rider|driver/.test(cb) ? 'courier' : /customer|client|user/.test(cb) ? 'customer' : '',
+      rej: rejBy.length || parseInt(g(r, A.rej)) || 0, rejBy, end });
+  }
+  if (!raw.length) throw new Error('All orders fall outside the 15 days before the latest order. Check the dates.');
+
+  // zones and couriers
+  const zcount = new Map(), zc = new Map();
+  for (const o of raw) {
+    zcount.set(o.zone, (zcount.get(o.zone) || 0) + 1);
+    if (o.cid) { let m = zc.get(o.cid); if (!m) { m = new Map(); zc.set(o.cid, m); } m.set(o.zone, (m.get(o.zone) || 0) + 1); }
+  }
+  const cmap = new Map();
+  const addC = id => {
+    if (cmap.has(id)) return cmap.get(id);
+    const c = { i: cmap.size, id, name: '', veh: 'motorbike', zone: '', tenure: null, rp: 0, cp: 0, sh: Array(DAYS).fill(null), st: Array.from({ length: DAYS }, () => ({ n: 0, rej: 0, can: 0 })), free0: 0, freeAt: 0 };
+    cmap.set(id, c); return c;
+  };
+  for (const r of cRows) {
+    const id = clean(g(r, AC.id)); if (!id) continue;
+    const c = addC(id); c.name = clean(g(r, AC.name)); c.zone = clean(g(r, AC.zone)); c.veh = normVeh(g(r, AC.veh));
+    const tn = parseFloat(g(r, AC.tenure)); c.tenure = isNaN(tn) ? null : tn;
+    if (c.zone && !zcount.has(c.zone)) zcount.set(c.zone, 0);
+  }
+  for (const r of sRows) { const id = clean(g(r, AS.id)); if (id) addC(id); }
+  for (const o of raw) { if (o.cid) addC(o.cid); for (const id of o.rejBy) addC(id); }
+  const zoneList = [...zcount.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(e => e[0]);
+  for (const c of cmap.values()) {
+    if (!c.zone) { const m = zc.get(c.id); c.zone = m ? [...m.entries()].sort((a, b) => b[1] - a[1])[0][0] : zoneList[0]; }
+    if (!c.name) c.name = c.id;
+  }
+  const couriers = [...cmap.values()];
+
+  const orders = [], byDay = Array.from({ length: DAYS }, () => []);
+  raw.forEach(o => {
+    const c = o.cid ? cmap.get(o.cid) : null;
+    const ob = { id: o.id, day: o.day, zone: o.zone, veh: c ? c.veh : 'unknown', cz: c ? c.zone : o.zone, ci: c ? c.i : -1, t: o.t, as: o.as, tp: o.tp, pw: o.pw, dr: o.dr, tot: o.tot, prom: o.prom, st: o.st, by: o.by, rej: o.rej, end: o.end };
+    orders.push(ob); byDay[o.day].push(ob);
+    if (c) { c.st[o.day].n++; if (o.by === 'courier') c.st[o.day].can++; if (o.day === 0 && o.end > c.free0) c.free0 = o.end; }
+    for (const id of o.rejBy) cmap.get(id).st[o.day].rej++;
+  });
+  byDay.forEach(l => l.sort((a, b) => a.t - b.t));
+
+  // shifts: use the file when it has the right columns, otherwise estimate from first and last order of each day
+  if (sRows.length && has(sRows, AS.s) && has(sRows, AS.e)) {
+    for (const r of sRows) {
+      const id = clean(g(r, AS.id)), s = parseTs(g(r, AS.s)), e = parseTs(g(r, AS.e));
+      if (!id || s == null || e == null || e <= s) continue;
+      const sd = Math.floor(s / 1440) * 1440, day = Math.round((day0 - sd) / 1440);
+      if (day < 0 || day >= DAYS) continue;
+      const c = cmap.get(id), a = s - sd, b = a + (e - s);
+      c.sh[day] = c.sh[day] ? [Math.min(c.sh[day][0], a), Math.max(c.sh[day][1], b)] : [a, b];
+    }
+  } else {
+    meta.inferred = true;
+    for (const o of orders) {
+      if (o.ci < 0 || o.as >= BIGV) continue;
+      const c = couriers[o.ci], a = Math.max(0, o.t + Math.min(o.as, 30) - 5), b = (o.end >= BIGE ? NOW_OF(maxAbs - day0) + 15 : o.end) + 5;
+      c.sh[o.day] = c.sh[o.day] ? [Math.min(c.sh[o.day][0], a), Math.max(c.sh[o.day][1], b)] : [a, b];
+    }
+  }
+  const firstDay = Math.max(...raw.map(o => o.day));
+  Object.assign(meta, { orders: orders.length, couriers: couriers.length, zones: zoneList.length, firstDay, days: new Set(raw.map(o => o.day)).size });
+  return { D: { couriers, orders, byDay }, NOW: maxAbs - day0, TODAY_MS: day0 * 60000, ZONES: zoneList.map(id => ({ id, w: 1, dist: 1, sup: 1, near: [] })), meta };
+}
+const NOW_OF = x => x;
+function setData(nd) { D = nd.D; NOW = nd.NOW; TODAY_MS = nd.TODAY_MS; ZONES = nd.ZONES; ZMAP = Object.fromEntries(ZONES.map(z => [z.id, z])); }
+function useSample() { setData(SAMPLE); }
+function hourRange() {
+  let lo = 23, hi = 0, any = false;
+  for (const l of D.byDay) for (const o of l) { const h = Math.floor(o.t / 60); if (h < lo) lo = h; if (h > hi) hi = h; any = true; }
+  if (!any) return [7, 23];
+  lo = Math.max(0, Math.min(lo, hi - 7)); hi = Math.min(23, Math.max(hi, lo + 7));
+  return [lo, hi];
+}
+
+if (typeof module !== 'undefined') module.exports = { dateOf, importData, parseCSV, hourRange, setData, useSample, get D() { return D; }, get NOW() { return NOW; }, get ZONES() { return ZONES; }, kpisFor, windowsFor, daily, hourly, zoneLive, liveState, lateOrders, idleCouriers, flaggedCouriers, stageByZone };
+
+</script>
+<script>
+/* ===== UI ===== */
+const $ = s => document.querySelector(s);
+const st = { range: 'today', zone: 'all', veh: 'all', tab: 'late' };
+const F = () => ({ zone: st.zone, veh: st.veh });
+const fmtT = m => { m = Math.floor(m); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+const dayLbl = d => dateOf(d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+const int = v => v == null ? '–' : Math.round(v).toLocaleString('en-US');
+const pct1 = v => v == null ? '–' : (v * 100).toFixed(1) + '%';
+const min1 = v => v == null ? '–' : v.toFixed(1);
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+const niceMax = v => { const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p; return 10 * p; };
+const VEH = { motorbike: 'Motorbike', bike: 'Bicycle', unknown: 'No courier yet' };
+const vehLbl = v => VEH[v] || (v ? v[0].toUpperCase() + v.slice(1) : '–');
+const who = r => `${r.name && r.name !== r.id ? r.name + ' ' : ''}<span class="mono">${r.id}</span>`;
+let META = { sample: true, cmp: 'last Tuesday', summary: '' };
+const tipAttr = (h, ...rows) => `data-tip="${esc([h, ...rows].join('|'))}"`;
+const win = () => windowsFor(st.range);
+
+/* ---------- live strip ---------- */
+function renderLive() {
+  const s = liveState(F());
+  const rostered = D.couriers.filter(c => c.sh[0] && passC(c, F())).length;
+  const idle12 = idleCouriers(F()).length;
+  const wcls = s.pending >= 8 ? 'bad' : s.pending >= 3 ? 'warn' : '';
+  $('#live').innerHTML = `
+    <div><span class="lbl">Couriers online</span><span class="val">${s.online}</span><span class="sub">${rostered} rostered today</span></div>
+    <div><span class="lbl">Busy</span><span class="val">${s.busy}</span><span class="sub">${s.online ? Math.round(s.busy / s.online * 100) : 0}% of online</span></div>
+    <div><span class="lbl">Idle</span><span class="val">${s.idle}</span><span class="sub">${idle12} idle for 12+ min</span></div>
+    <div><span class="lbl">Waiting for a courier</span><span class="val ${wcls}">${s.pending}</span><span class="sub">${s.pending ? 'oldest ' + Math.max(1, Math.round(s.oldestWait)) + ' min' : 'none waiting'}</span></div>
+    <div><span class="lbl">Orders in progress</span><span class="val">${s.active}</span><span class="sub">accepted or being prepared</span></div>`;
+}
+
+/* ---------- KPI tiles ---------- */
+const KPIS = [
+  { k: 'orders', label: 'Orders', fmt: int, unit: '', mode: 'rel', better: null },
+  { k: 'avgTot', label: 'Avg delivery time', fmt: min1, unit: 'min', mode: 'rel', better: 'down' },
+  { k: 'onTime', label: 'On-time rate', fmt: pct1, unit: '', mode: 'pp', better: 'up' },
+  { k: 'util', label: 'Courier utilization', fmt: pct1, unit: '', mode: 'pp', better: null },
+  { k: 'pickupWait', label: 'Wait at restaurant', fmt: min1, unit: 'min', mode: 'rel', better: 'down' },
+  { k: 'cancel', label: 'Cancelled orders', fmt: pct1, unit: '', mode: 'pp', better: 'down' },
+];
+function sparkSvg(vals, w) {
+  const h = 30, pts = vals.map((v, i) => v == null ? null : [i, v]).filter(Boolean);
+  if (pts.length < 2 || w < 40) return '';
+  const lo = Math.min(...pts.map(p => p[1])), hi = Math.max(...pts.map(p => p[1])), span = hi - lo || 1;
+  const x = i => 4 + i / (vals.length - 1) * (w - 8), y = v => h - 5 - (v - lo) / span * (h - 12);
+  const line = pts.map(p => `${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join(' ');
+  const last = pts[pts.length - 1];
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">
+    <polygon points="${x(pts[0][0]).toFixed(1)},${h} ${line} ${x(last[0]).toFixed(1)},${h}" fill="var(--accent)" fill-opacity="0.1"/>
+    <polyline points="${line}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${x(last[0]).toFixed(1)}" cy="${y(last[1]).toFixed(1)}" r="3.5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/></svg>`;
+}
+function renderKpis() {
+  const f = F(), w = win();
+  const cur = kpisFor(w.cur.days, w.cur.cut, f), prev = w.prev ? kpisFor(w.prev.days, w.prev.cut, f) : null;
+  const dl = daily(f);
+  $('#kpis').innerHTML = KPIS.map(m => {
+    const v = cur[m.k];
+    let chip = '<span class="chip">no comparison</span>';
+    if (prev && prev[m.k] != null && v != null) {
+      let d, txt;
+      if (m.mode === 'rel') { d = (v - prev[m.k]) / prev[m.k]; txt = (d >= 0 ? '+' : '') + (d * 100).toFixed(0) + '%'; }
+      else { d = (v - prev[m.k]) * 100; txt = (d >= 0 ? '+' : '') + d.toFixed(1) + ' pp'; }
+      const flat = m.mode === 'rel' ? Math.abs(d) < 0.02 : Math.abs(d) < 1;
+      let cls = '';
+      if (!flat && m.better) cls = (d > 0) === (m.better === 'up') ? 'good' : 'bad';
+      chip = `<span class="chip ${cls}">${flat ? 'flat' : txt}</span>`;
+    }
+    const cmp = prev ? `vs ${w.label}` : 'select a shorter range to compare';
+    return `<div class="kpi"><span class="lbl">${m.label}</span>
+      <span class="val">${m.fmt(v)}${m.unit && v != null ? `<small>${m.unit}</small>` : ''}</span>
+      <span class="dl">${chip}<span>${cmp}</span></span>
+      <div class="spark" data-k="${m.k}"></div></div>`;
+  }).join('');
+  document.querySelectorAll('.spark').forEach(el => {
+    const k = el.dataset.k, last = k === 'orders' ? 1 : 0, vals = [];
+    for (let d = 14; d >= last; d--) vals.push(dl[d][k]);
+    el.innerHTML = sparkSvg(vals, el.clientWidth);
+  });
+}
+
+/* ---------- charts ---------- */
+function chartHour() {
+  const el = $('#chHour'), w = Math.max(300, el.clientWidth), f = F();
+  const cur = hourly(0, f, NOW), last = hourly(7, f, FULL);
+  const [H0, H1] = hourRange(), n = H1 - H0 + 1, L = 38, R = 8;
+  const colW = (w - L - R) / n, A = { t: 24, h: 150 }, B = { t: 24 + 150 + 38, h: 84 }, total = B.t + B.h + 24;
+  const xc = h => L + (h - H0 + 0.5) * colW, xl = h => L + (h - H0) * colW;
+  const maxO = niceMax(Math.max(...cur.orders.slice(H0), ...last.orders.slice(H0), 1));
+  const maxC = niceMax(Math.max(...cur.couriers.slice(H0), 1));
+  const yA = v => A.t + A.h - v / maxO * A.h, yB = v => B.t + B.h - v / maxC * B.h;
+  const nowX = Math.max(L, Math.min(w - R, L + (NOW / 60 - H0) * colW)), nowH = Math.floor(NOW / 60), bw = Math.min(26, colW * 0.62);
+  let s = `<svg width="${w}" height="${total}" viewBox="0 0 ${w} ${total}" role="img" aria-label="Orders per hour and couriers online today compared with ${META.cmp}">`;
+  s += `<defs><clipPath id="cpP"><rect x="0" y="0" width="${nowX}" height="${total}"/></clipPath><clipPath id="cpF"><rect x="${nowX}" y="0" width="${w - nowX}" height="${total}"/></clipPath></defs>`;
+  s += `<text class="cap" x="${L}" y="${A.t - 10}">Orders per hour</text><text class="cap" x="${L}" y="${B.t - 10}">Couriers online (hour average)</text>`;
+  for (const [P, mx, y] of [[A, maxO, yA], [B, maxC, yB]]) for (const v of [0, mx / 2, mx]) s += `<line class="gl" x1="${L}" x2="${w - R}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${int(v)}</text>`;
+  for (let h = H0; h <= H1; h++) {
+    const v = cur.orders[h];
+    if (h <= nowH) s += `<rect x="${xc(h) - bw / 2}" y="${yA(v)}" width="${bw}" height="${A.t + A.h - yA(v)}" rx="2" fill="var(--demand)" fill-opacity="${h === nowH ? 0.55 : 1}"/>`;
+  }
+  const gl = []; for (let h = H0; h <= H1; h++) gl.push(`${xc(h).toFixed(1)},${yA(last.orders[h]).toFixed(1)}`);
+  s += `<polyline points="${gl.join(' ')}" fill="none" stroke="var(--ghost)" stroke-width="1.5"/>`;
+  for (let h = H0; h <= H1; h++) s += `<circle cx="${xc(h)}" cy="${yA(last.orders[h])}" r="4" fill="var(--surface)" stroke="var(--ghost)" stroke-width="2"/>`;
+  let top = '', d = `M${xl(H0)} ${B.t + B.h}`;
+  for (let h = H0; h <= H1; h++) { const y = yB(cur.couriers[h]); d += ` L${xl(h)} ${y} L${xl(h + 1)} ${y}`; top += `${top ? ' L' : 'M'}${xl(h)} ${y} L${xl(h + 1)} ${y}`; }
+  d += ` L${xl(H1 + 1)} ${B.t + B.h} Z`;
+  s += `<path d="${d}" fill="var(--supply)" fill-opacity="0.22" clip-path="url(#cpP)"/><path d="${d}" fill="var(--supply)" fill-opacity="0.08" clip-path="url(#cpF)"/>`;
+  s += `<path d="${top}" fill="none" stroke="var(--supply)" stroke-width="2" clip-path="url(#cpP)"/><path d="${top}" fill="none" stroke="var(--supply)" stroke-width="2" stroke-dasharray="5 4" clip-path="url(#cpF)"/>`;
+  s += `<line x1="${nowX}" x2="${nowX}" y1="${A.t - 4}" y2="${B.t + B.h}" stroke="var(--ink)" stroke-width="1" stroke-dasharray="3 3"/><text class="ax" x="${nowX + 5}" y="${A.t + 4}" style="fill:var(--ink);font-weight:700">${META.sample ? 'now' : 'as of'} ${fmtT(NOW)}</text>`;
+  const step = colW < 30 ? 2 : 1;
+  for (let h = H0; h <= H1; h += step) s += `<text class="ax" x="${xc(h)}" y="${B.t + B.h + 16}" text-anchor="middle">${colW < 30 ? h : String(h).padStart(2, '0') + ':00'}</text>`;
+  for (let h = H0; h <= H1; h++) s += `<rect class="hit" x="${xl(h)}" y="${A.t - 4}" width="${colW}" height="${B.t + B.h - A.t + 4}" ${tipAttr(`${fmtT(h * 60)}–${fmtT(h * 60 + 60)}${h === nowH ? ' (so far)' : ''}`, h <= nowH ? `Orders today: ${cur.orders[h]}` : 'Orders today: not yet', `Orders ${META.cmp}: ${last.orders[h]}`, `Couriers online: ${cur.couriers[h].toFixed(0)}${h > nowH ? ' (rostered)' : ''}`)}/>`;
+  el.innerHTML = s + '</svg>';
+  // headline + table
+  let a = 0, b = 0, ca = 0, ns = 0;
+  for (const o of D.byDay[0]) if (passO(o, f) && o.t > NOW - 60) a++;
+  for (const o of D.byDay[7]) if (passO(o, f) && o.t > NOW - 60 && o.t <= NOW) b++;
+  const dpct = b ? Math.round((a - b) / b * 100) : 0;
+  $('#hourNote').textContent = `Last hour: ${a} orders, ${dpct >= 0 ? '+' : ''}${dpct}% vs ${META.cmp}`;
+  let rows = ''; for (let h = H0; h <= H1; h++) rows += `<tr><td>${fmtT(h * 60)}</td><td class="r">${h <= nowH ? cur.orders[h] : '–'}</td><td class="r">${last.orders[h]}</td><td class="r">${cur.couriers[h].toFixed(0)}</td></tr>`;
+  $('#tblHour').innerHTML = `<table><thead><tr><th>Hour</th><th class="r">Orders today</th><th class="r">Orders ${META.cmp}</th><th class="r">Couriers online</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function chartTrend() {
+  const el = $('#chTrend'), w = Math.max(300, el.clientWidth), f = F(), dl = daily(f);
+  const days = []; for (let d = 14; d >= 0; d--) days.push(d);
+  const n = days.length, L = 38, R = 10, colW = (w - L - R) / n;
+  const A = { t: 24, h: 130 }, B = { t: 24 + 130 + 38, h: 100 }, total = B.t + B.h + 26;
+  const xc = i => L + (i + 0.5) * colW, xl = i => L + i * colW, bw = Math.min(22, colW * 0.62);
+  const maxO = niceMax(Math.max(...days.filter(d => d > 0).map(d => dl[d].orders), 1));
+  const yA = v => A.t + A.h - v / maxO * A.h;
+  const ot = days.map(d => dl[d].onTime).filter(v => v != null);
+  const lo = Math.max(0, Math.floor((Math.min(...ot, 0.8) - 0.03) * 20) / 20), hi = 1;
+  const yB = v => B.t + B.h - (v - lo) / (hi - lo) * B.h, target = 0.85;
+  let s = `<svg width="${w}" height="${total}" viewBox="0 0 ${w} ${total}" role="img" aria-label="Orders per day and on-time rate over the last 15 days">`;
+  s += `<text class="cap" x="${L}" y="${A.t - 10}">Orders per day</text><text class="cap" x="${L}" y="${B.t - 10}">On-time rate</text>`;
+  for (const v of [0, maxO / 2, maxO]) s += `<line class="gl" x1="${L}" x2="${w - R}" y1="${yA(v)}" y2="${yA(v)}"/><text class="ax" x="${L - 6}" y="${yA(v) + 4}" text-anchor="end">${int(v)}</text>`;
+  const ticks = []; for (let v = Math.ceil(lo * 10) / 10; v <= 1.0001; v += 0.1) ticks.push(v);
+  for (const v of ticks) s += `<line class="gl" x1="${L}" x2="${w - R}" y1="${yB(v)}" y2="${yB(v)}"/><text class="ax" x="${L - 6}" y="${yB(v) + 4}" text-anchor="end">${Math.round(v * 100)}%</text>`;
+  days.forEach((d, i) => { const v = dl[d].orders; s += `<rect x="${xc(i) - bw / 2}" y="${yA(v)}" width="${bw}" height="${A.t + A.h - yA(v)}" rx="2" fill="var(--demand)" fill-opacity="${d === 0 ? 0.45 : 1}"/>`; });
+  s += `<line x1="${L}" x2="${w - R}" y1="${yB(target)}" y2="${yB(target)}" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="5 4"/><text class="ax" x="${L + 4}" y="${yB(target) - 5}">target 85%</text>`;
+  const pts = days.map((d, i) => dl[d].onTime == null ? null : [i, dl[d].onTime]).filter(Boolean);
+  const hist = pts.filter(p => p[0] < n - 1), lastP = pts[pts.length - 1];
+  s += `<polyline points="${hist.map(p => `${xc(p[0]).toFixed(1)},${yB(p[1]).toFixed(1)}`).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>`;
+  if (hist.length && lastP) { const q = hist[hist.length - 1]; s += `<line x1="${xc(q[0])}" y1="${yB(q[1])}" x2="${xc(lastP[0])}" y2="${yB(lastP[1])}" stroke="var(--accent)" stroke-width="2" stroke-dasharray="3 3"/>`; }
+  hist.forEach(p => s += `<circle cx="${xc(p[0])}" cy="${yB(p[1])}" r="2.5" fill="var(--accent)"/>`);
+  if (lastP) s += `<circle cx="${xc(lastP[0])}" cy="${yB(lastP[1])}" r="5" fill="var(--surface)" stroke="var(--accent)" stroke-width="2.5"/>`;
+  const step = colW < 26 ? 3 : colW < 50 ? 2 : 1;
+  days.forEach((d, i) => { if ((n - 1 - i) % step === 0) s += `<text class="ax" x="${xc(i)}" y="${B.t + B.h + 16}" text-anchor="middle">${colW >= 50 ? dateOf(d).toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' }) + ' ' + dateOf(d).getUTCDate() : dateOf(d).getUTCDate()}</text>`; });
+  days.forEach((d, i) => { const k = dl[d]; s += `<rect class="hit" x="${xl(i)}" y="${A.t - 4}" width="${colW}" height="${B.t + B.h - A.t + 4}" ${tipAttr(dayLbl(d) + (d === 0 ? ' (so far)' : ''), `Orders: ${k.orders}`, `On-time: ${pct1(k.onTime)}`, `Avg delivery: ${min1(k.avgTot)} min`, `Utilization: ${pct1(k.util)}`)}/>`; });
+  el.innerHTML = s + '</svg>';
+  $('#tblTrend').innerHTML = `<table><thead><tr><th>Day</th><th class="r">Orders</th><th class="r">On-time</th><th class="r">Avg min</th><th class="r">Utilization</th></tr></thead><tbody>${[...days].reverse().map(d => `<tr><td>${dayLbl(d)}${d === 0 ? ' (so far)' : ''}</td><td class="r">${dl[d].orders}</td><td class="r">${pct1(dl[d].onTime)}</td><td class="r">${min1(dl[d].avgTot)}</td><td class="r">${pct1(dl[d].util)}</td></tr>`).join('')}</tbody></table>`;
+}
+
+const STAGES = [['as', 'Waiting for a courier', 'var(--st1)'], ['tp', 'Courier to restaurant', 'var(--st2)'], ['pw', 'Waiting at restaurant', 'var(--st3)'], ['dr', 'Pickup to customer', 'var(--st4)']];
+function chartStage() {
+  const el = $('#chStage'), w = Math.max(280, el.clientWidth), wd = win().cur;
+  const rows = stageByZone(wd.days, wd.cut, st.veh).filter(r => r.n > 0);
+  $('#stageNote').textContent = 'Average minutes per delivered order';
+  $('#stageLegend').innerHTML = STAGES.map(x => `<span><i style="background:${x[2]}"></i>${x[1]}</span>`).join('') + '<span><i class="ln dash" style="border-color:var(--ink)"></i>Promised time</span>';
+  const L = 84, R = 44, rh = 26, gap = 9, top = 6, tot = r => r.as + r.tp + r.pw + r.dr;
+  const mx = niceMax(Math.max(...rows.map(r => Math.max(tot(r), r.prom)), 1)), x = v => L + v / mx * (w - L - R);
+  const h = top + rows.length * (rh + gap);
+  let s = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Average minutes per order by stage and zone">`;
+  rows.forEach((r, i) => {
+    const y = top + i * (rh + gap), dim = st.zone !== 'all' && st.zone !== r.zone;
+    s += `<g class="stage-row${dim ? ' dim' : ''}"><text class="ax" x="${L - 8}" y="${y + rh / 2 + 4}" text-anchor="end" style="fill:var(--ink)">${r.zone}</text>`;
+    let acc = 0;
+    for (const [k, , c] of STAGES) { const x0 = x(acc), x1 = x(acc + r[k]); s += `<rect x="${x0}" y="${y}" width="${Math.max(0, x1 - x0)}" height="${rh}" fill="${c}" stroke="var(--surface)" stroke-width="2"/>`; acc += r[k]; }
+    s += `<line x1="${x(r.prom)}" x2="${x(r.prom)}" y1="${y - 3}" y2="${y + rh + 3}" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="3 2"/>`;
+    s += `<text class="ax" x="${x(Math.max(acc, r.prom)) + 7}" y="${y + rh / 2 + 4}" style="fill:var(--ink);font-weight:700">${acc.toFixed(1)}</text>`;
+    s += `<rect class="hit" x="0" y="${y - 4}" width="${w}" height="${rh + 8}" ${tipAttr(`${r.zone} · ${int(r.n)} orders`, ...STAGES.map(q => `${q[1]}: ${r[q[0]].toFixed(1)} min`), `Total: ${acc.toFixed(1)} min`, `Promised: ${r.prom.toFixed(0)} min`)}/></g>`;
+  });
+  el.innerHTML = s + '</svg>';
+}
+
+/* ---------- zones table ---------- */
+const STATUS = { short: ['Short', 3], ok: ['Balanced', 2], surplus: ['Surplus', 1] };
+function renderZones() {
+  const zl = zoneLive(st.veh).sort((a, b) => STATUS[b.status][1] - STATUS[a.status][1] || b.pending - a.pending || (b.perCourier || 0) - (a.perCourier || 0));
+  const rows = zl.map(z => `<tr class="click${st.zone === z.zone ? ' sel' : ''}" data-zone="${esc(z.zone)}" tabindex="0" role="button" aria-pressed="${st.zone === z.zone}">
+    <td><b>${z.zone}</b></td><td><span class="pill ${z.status}">${STATUS[z.status][0]}</span></td>
+    <td class="r">${z.rec}</td><td class="r">${z.online} <span class="mono">(${z.idle} idle)</span></td>
+    <td class="r">${z.perCourier == null ? '–' : z.perCourier.toFixed(1)}</td><td class="r">${z.pending}</td>
+    <td class="r">${z.avgTot == null ? '–' : z.avgTot.toFixed(1)}</td></tr>`).join('');
+  $('#zones').innerHTML = `<table style="min-width:470px"><thead><tr><th>Zone</th><th>Status</th><th class="r" title="Orders created in the last 60 minutes">Last hr</th><th class="r" title="Couriers online now (idle)">Couriers</th><th class="r" title="Orders in the last hour per courier online">Per courier</th><th class="r" title="Orders waiting for a courier">Waiting</th><th class="r" title="Average delivery minutes today">Avg min</th></tr></thead><tbody>${rows}</tbody></table>`;
+  return zl;
+}
+
+/* ---------- exceptions + insights ---------- */
+function renderExc(zl) {
+  const f = F(), late = lateOrders(f), idle = idleCouriers(f), flag = flaggedCouriers(f);
+  const shortZ = zl.filter(z => z.status === 'short').map(z => z.zone);
+  const tabs = [['late', 'Late and at-risk orders', late.length], ['idle', 'Idle couriers', idle.length], ['flag', 'Reliability flags', flag.length]];
+  $('#tabs').innerHTML = tabs.map(t => `<button type="button" role="tab" data-tab="${t[0]}" aria-selected="${st.tab === t[0]}">${t[1]}<span class="n">${t[2]}</span></button>`).join('');
+  const LIM = 12; let html = '', count = 0, list = [];
+  if (st.tab === 'late') {
+    list = late; count = late.length;
+    html = late.slice(0, LIM).map(r => {
+      const cls = r.over > 0 ? 'short' : 'warn', lbl = r.over > 0 ? `Late by ${Math.ceil(r.over)} min` : r.phase === 'Waiting for courier' && r.over < -6 ? 'Slow to assign' : 'At risk';
+      return `<tr><td class="mono">${r.id}</td><td>${r.zone}</td><td>${r.phase}</td><td>${r.courier} <span class="mono">${vehLbl(r.veh)}</span></td><td class="r">${Math.round(r.elapsed)} of ${r.prom} min</td><td class="r">${r.rej ? r.rej + ' rejected' : '–'}</td><td><span class="pill ${cls}">${lbl}</span></td></tr>`;
+    }).join('');
+    html = `<table style="min-width:640px"><thead><tr><th>Order</th><th>Zone</th><th>Stage</th><th>Courier</th><th class="r">Elapsed</th><th class="r">Offers refused</th><th>Status</th></tr></thead><tbody>${html}</tbody></table>`;
+  } else if (st.tab === 'idle') {
+    list = idle; count = idle.length;
+    html = idle.slice(0, LIM).map(r => {
+      const near = ZMAP[r.zone].near.filter(z => shortZ.includes(z)), target = shortZ.includes(r.zone) ? null : (near[0] || shortZ[0]);
+      return `<tr><td>${who(r)}</td><td>${r.zone}</td><td>${vehLbl(r.veh)}</td><td class="r">${Math.round(r.idle)} min</td><td class="r">${fmtT(r.ends)}</td><td>${target ? `<span class="pill surplus">Send to ${target}</span>` : '<span class="muted">No move needed</span>'}</td></tr>`;
+    }).join('');
+    html = `<table style="min-width:620px"><thead><tr><th>Courier</th><th>Home zone</th><th>Vehicle</th><th class="r">Idle for</th><th class="r">Shift ends</th><th>Suggested move</th></tr></thead><tbody>${html}</tbody></table>`;
+  } else {
+    list = flag; count = flag.length;
+    html = flag.slice(0, LIM).map(r => {
+      const rr = r.offers >= 25 && r.rejRate >= 0.3, cc = r.orders >= 15 && r.canRate >= 0.06;
+      return `<tr><td>${who(r)}</td><td>${r.zone}</td><td class="r">${r.tenure == null ? '–' : r.tenure + ' wk'}</td><td class="r">${r.orders}</td><td class="r">${(r.rejRate * 100).toFixed(0)}%</td><td class="r">${(r.canRate * 100).toFixed(1)}%</td><td>${rr ? '<span class="pill short">Rejects offers</span> ' : ''}${cc ? '<span class="pill warn">Cancels orders</span>' : ''}</td></tr>`;
+    }).join('');
+    html = `<table style="min-width:640px"><thead><tr><th>Courier</th><th>Home zone</th><th class="r">Tenure</th><th class="r">Orders, 7 days</th><th class="r">Rejected offers</th><th class="r">Cancelled</th><th>Flag</th></tr></thead><tbody>${html}</tbody></table>`;
+  }
+  $('#exc').innerHTML = count ? html + (count > LIM ? `<div class="more">Showing ${LIM} of ${count}</div>` : '') : `<div class="empty">Nothing to show for the current filters.</div>`;
+
+  // insights
+  const out = [];
+  const sz = zl.filter(z => z.status === 'short').sort((a, b) => b.pending - a.pending || (b.perCourier || 0) - (a.perCourier || 0))[0];
+  if (sz) {
+    const donors = zl.filter(z => z.idle >= 2 && z.zone !== sz.zone).sort((a, b) => (ZMAP[sz.zone].near.includes(b.zone) ? 1 : 0) - (ZMAP[sz.zone].near.includes(a.zone) ? 1 : 0) || b.idle - a.idle);
+    const dz = donors[0];
+    out.push(`<b>${sz.zone} is short of couriers.</b> It had ${sz.rec} orders in the last hour with ${sz.online} couriers online${sz.pending ? ` and ${sz.pending} waiting` : ''}. ${dz ? `${dz.zone} has ${dz.idle} idle couriers${ZMAP[sz.zone].near.includes(dz.zone) ? ' and borders it' : ''}; moving ${Math.min(dz.idle, 3)} would cover the gap.` : 'No zone has spare couriers to move, so consider an incentive for that area.'}`);
+  } else out.push('<b>No zone is short of couriers right now.</b> Keep an eye on the lunch ramp: the last-hour order count is the early signal.');
+  const wd = win().cur, sg = stageByZone(wd.days, wd.cut, st.veh).filter(r => r.n > 0);
+  if (sg.length) {
+    const tn = sg.reduce((s, r) => s + r.n, 0), avgPw = sg.reduce((s, r) => s + r.pw * r.n, 0) / tn, worst = [...sg].sort((a, b) => b.pw - a.pw)[0];
+    out.push(`<b>Couriers wait ${avgPw.toFixed(1)} minutes at restaurants per order.</b> ${worst.zone} is the worst at ${worst.pw.toFixed(1)}. Alerting couriers when food is ready, or sending them later, would cut this without adding supply.`);
+  }
+  let totRej = 0, flRej = 0; const ids = new Set(flag.map(r => r.id));
+  for (const c of D.couriers) if (passC(c, f)) for (let d = 0; d < 7; d++) { totRej += c.st[d].rej; if (ids.has(c.id)) flRej += c.st[d].rej; }
+  out.push(`<b>${flag.length} couriers are flagged for reliability.</b> They account for ${totRej ? Math.round(flRej / totRej * 100) : 0}% of rejected offers in the last 7 days. A call from courier support is cheaper than the reassignments they cause.`);
+  $('#insights').innerHTML = out.map((t, i) => `<li><span class="k">${i + 1}</span><span>${t}</span></li>`).join('');
+}
+
+/* ---------- wiring ---------- */
+function renderAll() {
+  renderLive(); renderKpis(); chartHour(); chartTrend(); chartStage();
+  const zl = renderZones(); renderExc(zl);
+}
+function buildSelects() {
+  $('#zoneSel').innerHTML = '<option value="all">All zones</option>' + ZONES.map(z => `<option value="${esc(z.id)}">${esc(z.id)}</option>`).join('');
+  const vs = [...new Set(D.couriers.map(c => c.veh))]; if (D.orders.some(o => o.veh === 'unknown')) vs.push('unknown');
+  $('#vehSel').innerHTML = '<option value="all">All vehicles</option>' + vs.map(v => `<option value="${esc(v)}">${esc(vehLbl(v))}</option>`).join('');
+  $('#zoneSel').value = 'all'; $('#vehSel').value = 'all';
+}
+function applyMeta() {
+  META.cmp = 'last ' + weekdayName(7);
+  const dl = dateOf(0).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  $('#metaLine').innerHTML = META.sample
+    ? `<span>Nairobi</span><span aria-hidden="true">·</span><span>${dl}</span><span aria-hidden="true">·</span><span class="mono">data as of ${fmtT(NOW)}</span><span class="tag">Sample data</span>`
+    : `<span>${dl}</span><span aria-hidden="true">·</span><span class="mono">data as of ${fmtT(NOW)}</span><span class="tag mine">Your data</span>`;
+  $('#hourTitle').textContent = 'Supply and demand ' + (META.sample ? 'today' : 'on the latest day');
+  $('#lgLast').textContent = 'Orders ' + META.cmp;
+  $('#excNote').textContent = (META.sample ? 'Live as of ' : 'Latest data at ') + fmtT(NOW);
+  $('#rangeSeg button[data-v="today"]').textContent = META.sample ? 'Today' : 'Latest day';
+  $('#foot').textContent = META.sample
+    ? 'This board runs on sample data generated for the prototype: 150 couriers, 8 Nairobi zones and about 14,000 orders over 15 days. Names and IDs are made up. Use Load your data to see it with your own files.'
+    : 'This board is showing the files you loaded. They are read in this browser and are not uploaded anywhere. The latest day is treated as "now", and the 14 days before it are used for comparison.';
+}
+$('#zoneSel').addEventListener('change', e => { st.zone = e.target.value; renderAll(); });
+$('#vehSel').addEventListener('change', e => { st.veh = e.target.value; renderAll(); });
+$('#rangeSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  st.range = b.dataset.v;
+  document.querySelectorAll('#rangeSeg button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  renderAll();
+});
+function pickZone(tr) { const z = tr.dataset.zone; st.zone = st.zone === z ? 'all' : z; $('#zoneSel').value = st.zone; renderAll(); }
+$('#zones').addEventListener('click', e => { const tr = e.target.closest('tr[data-zone]'); if (tr) pickZone(tr); });
+$('#zones').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { const tr = e.target.closest('tr[data-zone]'); if (tr) { e.preventDefault(); pickZone(tr); } } });
+$('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; st.tab = b.dataset.tab; renderExc(zoneLive(st.veh)); });
+
+const tip = $('#tip');
+function showTip(e) {
+  const t = e.target.closest && e.target.closest('[data-tip]');
+  if (!t) { tip.hidden = true; return; }
+  const [h, ...r] = t.getAttribute('data-tip').split('|');
+  tip.innerHTML = `<b>${h}</b>` + r.map(x => `<span>${x}</span>`).join('');
+  tip.hidden = false;
+  let x = e.clientX + 14, y = e.clientY + 14; const tw = tip.offsetWidth, th = tip.offsetHeight;
+  if (x + tw > innerWidth - 8) x = e.clientX - tw - 14; if (y + th > innerHeight - 8) y = e.clientY - th - 14;
+  tip.style.transform = `translate(${Math.max(4, x)}px,${Math.max(4, y)}px)`;
+}
+document.addEventListener('pointermove', showTip); document.addEventListener('pointerdown', showTip);
+document.addEventListener('pointerout', e => { if (!e.relatedTarget) tip.hidden = true; });
+
+let raf = 0, lastW = 0;
+new ResizeObserver(() => { const w = $('#app').clientWidth; if (w === lastW) return; lastW = w; cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { renderKpis(); chartHour(); chartTrend(); chartStage(); }); }).observe($('#app'));
+
+/* ---------- load your own data ---------- */
+const loader = $('#loader'), loadBtn = $('#loadBtn'), loadMsg = $('#loadMsg'), note = $('#dataNote');
+const setMsg = (kind, text) => { loadMsg.innerHTML = text ? `<div class="msg ${kind}">${text}</div>` : ''; };
+const openLoader = open => { loader.hidden = !open; loadBtn.setAttribute('aria-expanded', String(open)); };
+function applyData(nd) {
+  setData(nd); st.zone = 'all'; st.veh = 'all'; st.range = 'today'; st.tab = 'late';
+  document.querySelectorAll('#rangeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === 'today')));
+  buildSelects(); applyMeta(); renderAll();
+}
+loadBtn.addEventListener('click', () => { openLoader(loader.hidden); if (!loader.hidden) $('#fOrders').focus(); });
+$('#closeLoad').addEventListener('click', () => { openLoader(false); loadBtn.focus(); });
+document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', async () => {
+  const el = $('#' + b.dataset.copy);
+  try { await navigator.clipboard.writeText(el.textContent); b.textContent = 'Copied'; }
+  catch (e) { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = 'Selected, press Ctrl+C'; }
+  setTimeout(() => { b.textContent = 'Copy header row'; }, 2200);
+}));
+$('#sampleBtn').addEventListener('click', () => {
+  useSample(); META.sample = true; note.hidden = true; applyData(SAMPLE); setMsg('ok', 'Showing the sample data again.'); openLoader(false);
+});
+$('#buildBtn').addEventListener('click', async () => {
+  const fo = $('#fOrders').files[0], fc = $('#fCouriers').files[0], fs = $('#fShifts').files[0];
+  if (!fo) { setMsg('err', 'Choose an orders file first. It is the only required one.'); return; }
+  const btn = $('#buildBtn'); btn.disabled = true; setMsg('info', 'Reading your files…');
+  try {
+    const [ot, ct, sx] = await Promise.all([fo.text(), fc ? fc.text() : '', fs ? fs.text() : '']);
+    await new Promise(r => setTimeout(r, 30));
+    const nd = importData(ot, ct, sx), m = nd.meta;
+    META.sample = false;
+    applyData(nd);
+    const first = dateOf(m.firstDay).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    const w = [];
+    if (m.inferred) w.push('No usable shifts file, so each courier counts as online from their first to last order of the day. Utilization and idle times are estimates.');
+    if (m.noCouriersFile) w.push('No couriers file, so every courier is shown as a motorbike and their home zone is where they work most.');
+    if (m.noRejBy) w.push('No rejected_by column, so couriers cannot be flagged for rejecting offers.');
+    if (m.noProm) w.push(`${m.noProm.toLocaleString('en-US')} orders had no promised_minutes, so 35 minutes was assumed.`);
+    if (m.noStages) w.push(`${m.noStages.toLocaleString('en-US')} delivered orders had no stage times, so their time counts as delivery only.`);
+    if (m.bad) w.push(`${m.bad.toLocaleString('en-US')} rows were skipped because created_at could not be read.`);
+    if (m.old) w.push(`${m.old.toLocaleString('en-US')} orders older than 15 days were left out.`);
+    if (m.stale) w.push(`${m.stale.toLocaleString('en-US')} older orders with no delivery or cancellation were counted as cancelled.`);
+    note.innerHTML = `<b>Loaded ${m.orders.toLocaleString('en-US')} orders, ${m.couriers.toLocaleString('en-US')} couriers and ${m.zones} zones from ${first} to ${dateOf(0).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })}.</b>${w.length ? ' ' + w.join(' ') : ''}`;
+    note.hidden = false; setMsg('', ''); openLoader(false); scrollTo(0, 0);
+  } catch (e) { setMsg('err', esc(e.message || e)); }
+  finally { btn.disabled = false; }
+});
+
+applyMeta(); buildSelects(); renderAll();
+
+</script>
